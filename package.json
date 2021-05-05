@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "license": "MIT",
+  "author": "soulsam480 <soulsam480@hotmail.com>",
   "scripts": {
     "serve": "ts-node-dev --respawn -- src/index.ts"
   },
