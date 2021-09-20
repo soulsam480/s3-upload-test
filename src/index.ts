@@ -1,21 +1,25 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
-import AWS from 'aws-sdk';
+import {
+  GetObjectCommandInput,
+  PutObjectCommandInput,
+} from '@aws-sdk/client-s3';
 import { v4 as uuidv4 } from 'uuid';
-import dotenv from 'dotenv';
+import { getObject, getObjects, putObject } from './services';
+import { BUCKET, normalize } from './helpers';
 
-dotenv.config();
-const s3 = new AWS.S3({
-  accessKeyId: process.env.ACCESS_KEY,
-  secretAccessKey: process.env.SECRET_ACCESS_KEY,
-});
-
-console.log(s3.endpoint);
+const FILE_LIMIT = 5 * 1024 * 1024;
 
 const storage = multer.memoryStorage();
 
-const upload = multer({ storage }).single('image');
+const upload = multer({
+  storage,
+  limits: { files: 1, fileSize: FILE_LIMIT },
+}).single('file');
 
 const app = express();
 app.use(express.Router());
@@ -29,25 +33,57 @@ app.get('/', upload, (req, res) => {
   });
 });
 
-app.post('/upload', upload, (req, res) => {
-  let myFile = req.file.originalname.split('.');
-  const fileType = myFile[myFile.length - 1];
+app.get('/cdn', async (req, res) => {
+  return res.json(await getObjects());
+});
 
-  const params = {
-    Bucket: process.env.AWS_BUCKET_NAME as string,
-    Key: `images/${uuidv4()}.${fileType}`,
-    Body: req.file.buffer,
-  };
+app.post('/cdn', upload, async (req, res) => {
+  try {
+    const { scope = '' } = req.query;
 
-  s3.upload(params, (error: any, data: any) => {
-    if (error) {
-      res.status(500).send(error);
-    }
+    const objectParams: PutObjectCommandInput = {
+      Bucket: BUCKET,
+      Key: `${scope ? `${scope}/` : ''}${uuidv4()}--${normalize(
+        req.file.originalname,
+      )}`,
+      Body: req.file.buffer,
+      ContentType: req.file.mimetype,
+      Metadata: {
+        type: req.file.mimetype,
+      },
+    };
 
-    res.status(200).json({
-      url: data.Location,
-    });
-  });
+    const response = await putObject(objectParams);
+
+    res.json(response);
+  } catch (error) {
+    res.status(500).send(error);
+  }
+});
+
+app.get('/cdn/file', async (req, res) => {
+  try {
+    const { file_name } = req.query;
+
+    if (!file_name) return res.status(400).send('No filename found !');
+
+    const objectParams: GetObjectCommandInput = {
+      Bucket: BUCKET,
+      Key: file_name as string,
+    };
+
+    const response = await getObject(objectParams);
+
+    if (!response) return res.status(400).send("File doesn't exist !");
+
+    const { file, type } = response;
+
+    // res.setHeader('Content-Type', (type as string) || 'application/json');
+
+    res.send(file);
+  } catch (error) {
+    res.status(500).send(error);
+  }
 });
 
 app.listen(3000, () => {
