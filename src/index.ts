@@ -12,6 +12,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { getObject, getObjects, putObject } from './services';
 import { BUCKET, normalize } from './helpers';
 
+// allow 5mb
 const FILE_LIMIT = 5 * 1024 * 1024;
 
 const storage = multer.memoryStorage();
@@ -27,12 +28,6 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.get('/', upload, (req, res) => {
-  res.send({
-    sent: req.body,
-  });
-});
-
 app.get('/cdn', async (req, res) => {
   return res.json(await getObjects());
 });
@@ -41,11 +36,13 @@ app.post('/cdn', upload, async (req, res) => {
   try {
     const { scope = '' } = req.query;
 
+    const file_name = `${scope ? `${scope}/` : ''}${uuidv4()}--${normalize(
+      req.file.originalname,
+    )}`;
+
     const objectParams: PutObjectCommandInput = {
       Bucket: BUCKET,
-      Key: `${scope ? `${scope}/` : ''}${uuidv4()}--${normalize(
-        req.file.originalname,
-      )}`,
+      Key: file_name,
       Body: req.file.buffer,
       ContentType: req.file.mimetype,
       Metadata: {
@@ -53,11 +50,13 @@ app.post('/cdn', upload, async (req, res) => {
       },
     };
 
-    const response = await putObject(objectParams);
+    await putObject(objectParams);
 
-    res.json(response);
+    return res.json({ key: file_name });
   } catch (error) {
-    res.status(500).send(error);
+    console.log(error);
+
+    return res.status(500).send(error);
   }
 });
 
@@ -78,11 +77,13 @@ app.get('/cdn/file', async (req, res) => {
 
     const { file, type } = response;
 
-    // res.setHeader('Content-Type', (type as string) || 'application/json');
+    res.setHeader('Content-Type', type);
 
-    res.send(file);
+    return res.send(file);
   } catch (error) {
-    res.status(500).send(error);
+    console.log(error);
+
+    return res.status(500).send(error);
   }
 });
 

@@ -7,10 +7,10 @@ export function normalize(str: string) {
     .join('_');
 }
 
-export const streamToString = (stream: any) =>
+export const streamToString = (stream: any): Promise<Buffer> =>
   new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     stream.on('data', (chunk: Buffer) => chunks.push(chunk));
     stream.on('error', reject);
-    stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    stream.on('end', () => resolve(Buffer.concat(chunks)));
   });

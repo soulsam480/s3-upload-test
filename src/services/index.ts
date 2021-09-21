@@ -36,7 +36,7 @@ export async function getObject(data: GetObjectCommandInput) {
 
     const file = await streamToString(response.Body);
 
-    return { file, type: response.Metadata?.type };
+    return { file, type: response.Metadata?.type as any };
   } catch (error) {
     Promise.reject(error);
   }
