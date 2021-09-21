@@ -34,9 +34,16 @@ export async function getObject(data: GetObjectCommandInput) {
   try {
     const response = await s3Client.send(new GetObjectCommand(data));
 
+    const { ContentLength, ContentType, AcceptRanges } = response;
+
     const file = await streamToString(response.Body);
 
-    return { file, type: response.Metadata?.type as any };
+    return {
+      file,
+      type: ContentType as string,
+      length: ContentLength as number,
+      ranges: AcceptRanges as string,
+    };
   } catch (error) {
     Promise.reject(error);
   }

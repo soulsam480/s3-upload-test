@@ -27,6 +27,7 @@ app.use(express.Router());
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.enable('etag'); // use strong etags
 
 app.get('/cdn', async (req, res) => {
   return res.json(await getObjects());
@@ -75,9 +76,16 @@ app.get('/cdn/file', async (req, res) => {
 
     if (!response) return res.status(400).send("File doesn't exist !");
 
-    const { file, type } = response;
+    const { file, type, length, ranges } = response;
 
+    res.setHeader('Accept-Ranges', ranges);
+    res.setHeader(
+      'Cache-Control',
+      'public, no-transform, immutable, max-age=2592000',
+    );
+    res.setHeader('Content-Length', length);
     res.setHeader('Content-Type', type);
+    res.setHeader('Date', new Date().toString());
 
     return res.send(file);
   } catch (error) {
